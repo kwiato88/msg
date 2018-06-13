@@ -23,6 +23,10 @@ int main()
 		resp = client.sendReq(req);
 		std::cout << "Received response [" << resp << "]" << std::endl;
 
+		req = "print";
+		std::cout << "Send print ind [" << req << "]" << std::endl;
+		client.sendInd(req);
+
 		req = "dummy req";
 		std::cout << "Send request [" << req << "]" << std::endl;
 		resp = client.sendReq(req);
@@ -37,7 +41,7 @@ int main()
 	}
 	catch (std::exception& e)
 	{
-		std::cout << "Something went wrong. Detail: " << e.what();
+		std::cout << "Something went wrong. Detail: " << e.what() << std::endl;
 		sock::cleanup();
 		return 1;
 	}

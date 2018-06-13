@@ -6,23 +6,36 @@
 enum class MessageId
 {
 	Stop,
-	Echo
+	Echo,
+	Print
 };
 
 MessageId getId(const std::string& p_msg)
 {
 	if (p_msg == "stop")
 		return MessageId::Stop;
+	if (p_msg == "print")
+		return MessageId::Print;
 	return MessageId::Echo;
 }
 
-class EchoHandler : public msg::Handler
+class EchoReqHandler : public msg::Handler
 {
 public:
 	std::string handle(const std::string& p_req) override
 	{
 		std::cout << "Echo message. Received [" << p_req << "]. Reply the same" << std::endl;
 		return p_req;
+	}
+};
+
+class PrintIndHandler : public msg::Handler
+{
+public:
+	std::string handle(const std::string& p_req) override
+	{
+		std::cout << "Print message. Received [" << p_req << "]. Reply nothing" << std::endl;
+		return "";
 	}
 };
 
@@ -54,7 +67,8 @@ public:
 		: BaseService(&createLocalTcpIpServer, &getId)
 	{
 		addHandler(MessageId::Stop, std::make_unique<StopHandler>(*this));
-		addHandler(MessageId::Echo, std::make_unique<EchoHandler>());
+		addHandler(MessageId::Echo, std::make_unique<EchoReqHandler>());
+		addHandler(MessageId::Print, std::make_unique<PrintIndHandler>());
 	}
 };
 
@@ -74,7 +88,7 @@ int main()
 	}
 	catch (std::exception& e)
 	{
-		std::cout << "Something went wrong. Detail: " << e.what();
+		std::cout << "Something went wrong. Detail: " << e.what() << std::endl;
 		sock::cleanup();
 		return 1;
 	}
