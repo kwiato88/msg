@@ -7,7 +7,7 @@ TcpIpServer::TcpIpServer(const std::string& p_host, const std::string& p_port)
 	: ser(p_host, p_port), conn(nullptr)
 {}
 
-std::string TcpIpServer::receiveReg()
+std::string TcpIpServer::receiveReq()
 {
 	conn = std::move(ser.accept());
 	return conn->receive();
