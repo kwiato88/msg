@@ -3,10 +3,10 @@ cmake_minimum_required(VERSION 2.8)
 project(Msg)
 
 link_directories(
-    D:/boost_1_61_0/stage/lib
+    C:/Users/pikwiatk/boost_1_61_0/binMsvc
     D:/googletest-release-1.6.0/Build/Debug
     D:/googlemock-release-1.6.0/Build/Debug
-    D:/test/sock/BuildMS/Release
+    C:/Users/pikwiatk/sock/BuildMS/Release
 )
 
 add_library(
@@ -16,6 +16,7 @@ add_library(
     Source/MsgTcpIpConnection.cpp
     Source/MsgTcpIpServer.cpp
     Source/MsgService.cpp
+    Source/MsgHandler.cpp
 )
 
 target_include_directories(
@@ -23,9 +24,9 @@ target_include_directories(
     PUBLIC
     Include
     ../sock/Include
-    D:/boost_1_61_0
-    D:/googletest-release-1.6.0/include
-    D:/googlemock-release-1.6.0/include
+    C:/Users/pikwiatk/boost_1_61_0
+    C:/Users/pikwiatk/googletest-release-1.6.0/include
+    C:/Users/pikwiatk/googlemock-release-1.6.0/include
 )
 
 add_executable(
@@ -38,9 +39,9 @@ target_include_directories(
     PUBLIC
     Include
     ../sock/Include
-    D:/boost_1_61_0
-    D:/googletest-release-1.6.0/include
-    D:/googlemock-release-1.6.0/include
+    C:/Users/pikwiatk/boost_1_61_0
+    C:/Users/pikwiatk/googletest-release-1.6.0/include
+    C:/Users/pikwiatk/googlemock-release-1.6.0/include
 )
 
 add_dependencies(
@@ -65,9 +66,9 @@ target_include_directories(
     PUBLIC
     Include
     ../sock/Include
-    D:/boost_1_61_0
-    D:/googletest-release-1.6.0/include
-    D:/googlemock-release-1.6.0/include
+    C:/Users/pikwiatk/boost_1_61_0
+    C:/Users/pikwiatk/googletest-release-1.6.0/include
+    C:/Users/pikwiatk/googlemock-release-1.6.0/include
 )
 
 add_dependencies(
