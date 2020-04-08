@@ -48,6 +48,10 @@ int main()
 		std::cout << "Send ind [" << req << "]" << std::endl;
 		client.sendInd(req);
 
+		req = "setPrinterStatus";
+		std::cout << "Send ind [" << req << "]" << std::endl;
+		client.sendInd(req);
+
 		req = "stop";
 		std::cout << "Send stop server ind" << std::endl;
 		client.sendInd(req);

@@ -10,7 +10,8 @@ enum class MessageId
 	Echo,
 	Print,
 	SendToPrinter,
-	GetPrinterStatus
+	GetPrinterStatus,
+	SetPrinterStatus
 };
 
 MessageId getId(const std::string& p_msg)
@@ -23,6 +24,8 @@ MessageId getId(const std::string& p_msg)
 		return MessageId::SendToPrinter;
 	if (p_msg == "getPrinterStatus")
 		return MessageId::GetPrinterStatus;
+	if (p_msg == "setPrinterStatus")
+		return MessageId::SetPrinterStatus;
 	return MessageId::Echo;
 }
 
@@ -78,6 +81,16 @@ public:
 	}
 };
 
+class LoggingHandler : public msg::Handler
+{
+public:
+	std::string handle(const std::string& p_req) override
+	{
+		std::cout << "Log message. Received [" << p_req << "]." << std::endl;
+		return "";
+	}
+};
+
 using BaseService = msg::Service<MessageId>;
 
 std::unique_ptr<msg::Server> createLocalTcpIpServer()
@@ -110,6 +123,7 @@ public:
 		addHandler(MessageId::Print, std::make_unique<PrintIndHandler>());
 		addHandler(MessageId::SendToPrinter, std::make_unique<SendToPrinterIndHandler>());
 		addHandler(MessageId::GetPrinterStatus, std::make_unique<GetPrinterStatusReqHandler>());
+		setDefaultHandler(std::make_unique<LoggingHandler>());
 	}
 };
 
