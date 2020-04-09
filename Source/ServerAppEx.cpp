@@ -101,24 +101,11 @@ std::unique_ptr<msg::Server> createLocalTcpIpServer()
 
 class EchoService : public BaseService
 {
-	class StopHandler : public msg::Handler
-	{
-	public:
-		StopHandler(BaseService& p_ser) : service(p_ser) {}
-		std::string handle(const std::string& p_req) override
-		{
-			std::cout << "Stop message. Received [" << p_req << "]. Stoping service" << std::endl;
-			service.stop();
-			return "";
-		}
-	private:
-		BaseService& service;
-	};
 public:
 	EchoService()
 		: BaseService(&createLocalTcpIpServer, &getId)
 	{
-		addHandler(MessageId::Stop, std::make_unique<StopHandler>(*this));
+		addHandler(MessageId::Stop, std::make_unique<BaseService::NativeStopHandler>(*this));
 		addHandler(MessageId::Echo, std::make_unique<EchoReqHandler>());
 		addHandler(MessageId::Print, std::make_unique<PrintIndHandler>());
 		addHandler(MessageId::SendToPrinter, std::make_unique<SendToPrinterIndHandler>());

@@ -45,6 +45,17 @@ public:
 		std::function<void(void)> callback;
 	};
 
+	class NativeStopHandler : public msg::Handler
+	{
+	public:
+		NativeStopHandler(Service<MsgId>& p_service);
+		NativeStopHandler(Service<MsgId>& p_service, std::function<void(void)> p_callback);
+		std::string handle(const std::string&);
+	private:
+		Service<MsgId>& service;
+		std::function<void(void)> callback;
+	};
+
 private:
 	void setup();
 	void handleRequest();
@@ -166,6 +177,24 @@ Service<MsgId>::StopHandler<StopMessage>::StopHandler(Service<MsgId>& p_service,
 template <typename MsgId>
 template<typename StopMessage>
 void Service<MsgId>::StopHandler<StopMessage>::handle(const StopMessage& p_msg)
+{
+	service.stop();
+	if (callback)
+		callback();
+}
+
+template <typename MsgId>
+Service<MsgId>::NativeStopHandler::NativeStopHandler(Service<MsgId>& p_service)
+	: service(p_service)
+{}
+
+template <typename MsgId>
+Service<MsgId>::NativeStopHandler::NativeStopHandler(Service<MsgId>& p_service, std::function<void(void)> p_callback)
+	: service(p_service), callback(p_callback)
+{}
+
+template <typename MsgId>
+std::string Service<MsgId>::NativeStopHandler::handle(const std::string& p_msg)
 {
 	service.stop();
 	if (callback)
