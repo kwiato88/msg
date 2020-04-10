@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include <map>
 #include <functional>
@@ -92,11 +93,18 @@ void Service<MsgId>::start()
 template<typename MsgId>
 void Service<MsgId>::handleRequest()
 {
-	auto resp = handle(server->receiveReq());
-	if (resp.empty())
-		server->reply(boost::none);
-	else
-		server->reply(resp);
+	try
+	{
+		auto resp = handle(server->receiveReq());
+		if (resp.empty())
+			server->reply(boost::none);
+		else
+			server->reply(resp);
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "ERROR while handling message. " << e.what() << std::endl;
+	}
 }
 
 template<typename MsgId>
