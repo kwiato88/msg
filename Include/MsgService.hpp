@@ -19,6 +19,11 @@ template<typename MsgId>
 class Service
 {
 public:
+	enum class Processing
+	{
+		Sync,
+		Async
+	};
 	typedef std::function<MsgId(const std::string& p_payload)> GetMsgId;
 
 	Service(ServerFacotry p_facotry, GetMsgId p_getMsgId);
@@ -26,17 +31,17 @@ public:
 	void start();
 	void stop();
 	void cleanup();
-	void addHandler(MsgId p_id, std::unique_ptr<Handler> p_handler);
-	void setDefaultHandler(std::unique_ptr<Handler> p_handler);
+	void addHandler(MsgId p_id, std::unique_ptr<Handler> p_handler, Processing p_type = Processing::Sync);
+	void setDefaultHandler(std::unique_ptr<Handler> p_handler, Processing p_type = Processing::Sync);
 
 	template<typename HandlerType, typename Codec>
 	void addReqHandler(std::unique_ptr<HandlerType> p_handler);
 	template<typename HandlerType, typename Codec>
-	void addIndHandler(std::unique_ptr<HandlerType> p_handler);
+	void addIndHandler(std::unique_ptr<HandlerType> p_handler, Processing p_type = Processing::Sync);
 	template<typename Codec, typename ReqType, typename RespType>
 	void addFunReqHandler(std::function<RespType(const ReqType&)> p_handler);
 	template<typename Codec, typename IndType>
-	void addFunIndHandler(std::function<void(const IndType&)> p_handler);
+	void addFunIndHandler(std::function<void(const IndType&)> p_handler, Processing p_type = Processing::Sync);
 
 	template<typename StopMessage>
 	class StopHandler : public msg::IndicationHandler<StopMessage>
@@ -62,21 +67,30 @@ public:
 	};
 
 private:
+	struct HandlingData
+	{
+		HandlingData(Processing p_type, std::unique_ptr<Handler> p_handler)
+			: processingType(p_type), handler(std::move(p_handler))
+		{}
+		Processing processingType;
+		std::unique_ptr<Handler> handler;
+	};
 	void setup();
 	void handleRequest();
-	std::string handle(const std::string& p_req);
+	void handle(const std::string& p_msg, const HandlingData& p_context);
+	void reply(const std::string& p_resp);
 
 	ServerFacotry factory;
 	GetMsgId getMsgId;
 	std::unique_ptr<Server> server;
 	bool isRunning;
-	std::map<MsgId, std::unique_ptr<Handler>> handlers;
-	std::unique_ptr<Handler> defaultHandler;
+	std::map<MsgId, HandlingData> handlers;
+	HandlingData defaultHandler;
 };
 
 template<typename MsgId>
 Service<MsgId>::Service(ServerFacotry p_facotry, GetMsgId p_getMsgId)
-	: factory(p_facotry), getMsgId(p_getMsgId), server(nullptr), isRunning(false), defaultHandler(std::make_unique<EmptyHandler>())
+	: factory(p_facotry), getMsgId(p_getMsgId), server(nullptr), isRunning(false), defaultHandler(Processing::Sync, std::make_unique<EmptyHandler>())
 {}
 
 template<typename MsgId>
@@ -99,11 +113,13 @@ void Service<MsgId>::handleRequest()
 {
 	try
 	{
-		auto resp = handle(server->receiveReq());
-		if (resp.empty())
-			server->reply(boost::none);
+		std::string msg = server->receiveReq();
+		MsgId id = getMsgId(msg);
+		auto handler = handlers.find(id);
+		if (handler == handlers.end())
+			handle(msg, defaultHandler);
 		else
-			server->reply(resp);
+			handle(msg, handler->second);
 	}
 	catch (std::exception& e)
 	{
@@ -112,13 +128,24 @@ void Service<MsgId>::handleRequest()
 }
 
 template<typename MsgId>
-std::string Service<MsgId>::handle(const std::string& p_req)
+void Service<MsgId>::handle(const std::string& p_msg, const HandlingData& p_context)
 {
-	MsgId id = getMsgId(p_req);
-	auto handler = handlers.find(id);
-	if (handler != handlers.end())
-		return handler->second->handleMsg(p_req);
-	return defaultHandler->handleMsg(p_req);
+	if (p_context.processingType == Processing::Sync)
+		reply(p_context.handler->handleMsg(p_msg));
+	else
+	{
+		server->reply(boost::none);
+		p_context.handler->handleMsg(p_msg);
+	}
+}
+
+template<typename MsgId>
+void Service<MsgId>::reply(const std::string& p_resp)
+{
+	if (p_resp.empty())
+		server->reply(boost::none);
+	else
+		server->reply(p_resp);
 }
 
 template<typename MsgId>
@@ -134,15 +161,15 @@ void Service<MsgId>::cleanup()
 }
 
 template<typename MsgId>
-void Service<MsgId>::addHandler(MsgId p_id, std::unique_ptr<Handler> p_handler)
+void Service<MsgId>::addHandler(MsgId p_id, std::unique_ptr<Handler> p_handler, Processing p_type)
 {
-	handlers[p_id] = std::move(p_handler);
+	handlers.insert_or_assign(p_id, std::move(HandlingData(p_type, std::move(p_handler))));
 }
 
 template<typename MsgId>
-void Service<MsgId>::setDefaultHandler(std::unique_ptr<Handler> p_handler)
+void Service<MsgId>::setDefaultHandler(std::unique_ptr<Handler> p_handler, Processing p_type)
 {
-	defaultHandler = std::move(p_handler);
+	defaultHandler = std::move(HandlingData(p_type, std::move(p_handler)));
 }
 
 template <typename MsgId>
@@ -156,13 +183,14 @@ void Service<MsgId>::addReqHandler(std::unique_ptr<HandlerType> p_handler)
 	addHandler(
 		ReqT::id,
 		std::move(msg::buildRequestDecodingHandler<HandlerType, ExceptionT>(
-			std::move(p_handler), &Codec::decode<ReqT> , &Codec::encode<RespT>))
+			std::move(p_handler), &Codec::decode<ReqT> , &Codec::encode<RespT>)),
+		Processing::Sync
 	);
 }
 
 template <typename MsgId>
 template<typename HandlerType, typename Codec>
-void Service<MsgId>::addIndHandler(std::unique_ptr<HandlerType> p_handler)
+void Service<MsgId>::addIndHandler(std::unique_ptr<HandlerType> p_handler, Processing p_type)
 {
 	using IndT = typename HandlerType::IndicationType;
 	using ExceptionT = typename Codec::ExceptionType;
@@ -170,7 +198,8 @@ void Service<MsgId>::addIndHandler(std::unique_ptr<HandlerType> p_handler)
 	addHandler(
 		IndT::id,
 		std::move(msg::buildIndicationDecodingHandler<HandlerType, ExceptionT>(
-			std::move(p_handler), &Codec::decode<IndT>))
+			std::move(p_handler), &Codec::decode<IndT>)),
+		p_type
 	);
 }
 
@@ -180,16 +209,18 @@ void Service<MsgId>::addFunReqHandler(std::function<RespType(const ReqType&)> p_
 {
 	addHandler(
 		ReqType::id,
-		std::make_unique<HandlerWtihFunctor<ReqType, RespType>>(p_handler, &Codec::decode<ReqType>, &Codec::encode<RespType>));
+		std::make_unique<HandlerWtihFunctor<ReqType, RespType>>(p_handler, &Codec::decode<ReqType>, &Codec::encode<RespType>),
+		Processing::Sync);
 }
 
 template <typename MsgId>
 template<typename Codec, typename IndType>
-void Service<MsgId>::addFunIndHandler(std::function<void(const IndType&)> p_handler)
+void Service<MsgId>::addFunIndHandler(std::function<void(const IndType&)> p_handler, Processing p_type)
 {
 	addHandler(
 		IndType::id,
-		std::make_unique<IndHandlerWtihFunctor<IndType>>(p_handler, &Codec::decode<IndType>));
+		std::make_unique<IndHandlerWtihFunctor<IndType>>(p_handler, &Codec::decode<IndType>),
+		p_type);
 }
 
 template <typename MsgId>
