@@ -85,21 +85,15 @@ public:
 		std::function<std::string(const Resp&)> p_encoder)
 		: handler(p_handler), decoder(p_decoder), encoder(p_encoder)
 	{}
-	HandlerWtihFunctor(std::function<Resp(const Req&)> p_handler,
-		std::function<void(std::exception&)> p_errorHandler,
-		std::function<Req(const std::string&)> p_decoder,
-		std::function<std::string(const Resp&)> p_encoder)
-		: handler(p_handler), errorHander(p_errorHandler), decoder(p_decoder), encoder(p_encoder)
-	{}
 
 	std::string handle(const std::string& p_payload)
 	{
-		return encoder(handle(decoder(p_payload)));
+		return encoder(handler(decoder(p_payload)));
 	}
 	std::string onError(std::exception& e)
 	{
-		if (onError)
-			onError(e);
+		if (errorHander)
+			errorHander(e);
 		return std::string();
 	}
 
@@ -118,21 +112,16 @@ public:
 		std::function<Ind(const std::string&)> p_decoder)
 		: handler(p_handler), decoder(p_decoder)
 	{}
-	IndHandlerWtihFunctor(std::function<void(const Ind&)> p_handler,
-		std::function<void(std::exception&)> p_errorHandler,
-		std::function<Ind(const std::string&)> p_decoder)
-		: handler(p_handler), errorHander(p_errorHandler), decoder(p_decoder)
-	{}
 
 	std::string handle(const std::string& p_payload)
 	{
-		handle(decoder(p_payload));
+		handler(decoder(p_payload));
 		return std::string();
 	}
 	std::string onError(std::exception& e)
 	{
-		if (onError)
-			onError(e);
+		if (errorHander)
+			errorHander(e);
 		return std::string();
 	}
 

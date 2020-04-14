@@ -34,11 +34,9 @@ public:
 	template<typename HandlerType, typename Codec>
 	void addIndHandler(std::unique_ptr<HandlerType> p_handler);
 	template<typename Codec, typename ReqType, typename RespType>
-	void addReqHandler(std::function<RespType(const ReqType&)> p_handler,
-		std::function<void(std::exception&)> p_onError = std::function<void(std::exception&)>);
+	void addFunReqHandler(std::function<RespType(const ReqType&)> p_handler);
 	template<typename Codec, typename IndType>
-	void addIndHandler(std::function<void(const IndType&)> p_handler,
-		std::function<void(std::exception&)> p_onError = std::function<void(std::exception&)>);
+	void addFunIndHandler(std::function<void(const IndType&)> p_handler);
 
 	template<typename StopMessage>
 	class StopHandler : public msg::IndicationHandler<StopMessage>
@@ -178,20 +176,20 @@ void Service<MsgId>::addIndHandler(std::unique_ptr<HandlerType> p_handler)
 
 template <typename MsgId>
 template<typename Codec, typename ReqType, typename RespType>
-void Service<MsgId>::addReqHandler(std::function<RespType(const ReqType&)> p_handler, std::function<void(std::exception&)> p_onError)
+void Service<MsgId>::addFunReqHandler(std::function<RespType(const ReqType&)> p_handler)
 {
 	addHandler(
 		ReqType::id,
-		std::make_unique<HandlerWtihFunctor>(p_handler, p_onError, &Codec::decode<ReqType>, &Codec::encode<RespType>));
+		std::make_unique<HandlerWtihFunctor<ReqType, RespType>>(p_handler, &Codec::decode<ReqType>, &Codec::encode<RespType>));
 }
 
 template <typename MsgId>
 template<typename Codec, typename IndType>
-void Service<MsgId>::addIndHandler(std::function<void(const IndType&)> p_handler, std::function<void(std::exception&)> p_onError)
+void Service<MsgId>::addFunIndHandler(std::function<void(const IndType&)> p_handler)
 {
 	addHandler(
 		IndType::id,
-		std::make_unique<IndHandlerWtihFunctor>(p_handler, p_onError, &Codec::decode<IndType>));
+		std::make_unique<IndHandlerWtihFunctor<IndType>>(p_handler, &Codec::decode<IndType>));
 }
 
 template <typename MsgId>
