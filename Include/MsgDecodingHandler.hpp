@@ -76,4 +76,70 @@ std::unique_ptr<Handler> buildIndicationDecodingHandler(
 	return std::make_unique<IndicationDecondingHandler<typename IndHandlerType::IndicationType, CodecException>>(std::move(p_handler), p_decoder);
 }
 
+template <typename Req, typename Resp>
+class HandlerWtihFunctor : public Handler
+{
+public:
+	HandlerWtihFunctor(std::function<Resp(const Req&)> p_handler,
+		std::function<Req(const std::string&)> p_decoder,
+		std::function<std::string(const Resp&)> p_encoder)
+		: handler(p_handler), decoder(p_decoder), encoder(p_encoder)
+	{}
+	HandlerWtihFunctor(std::function<Resp(const Req&)> p_handler,
+		std::function<void(std::exception&)> p_errorHandler,
+		std::function<Req(const std::string&)> p_decoder,
+		std::function<std::string(const Resp&)> p_encoder)
+		: handler(p_handler), errorHander(p_errorHandler), decoder(p_decoder), encoder(p_encoder)
+	{}
+
+	std::string handle(const std::string& p_payload)
+	{
+		return encoder(handle(decoder(p_payload)));
+	}
+	std::string onError(std::exception& e)
+	{
+		if (onError)
+			onError(e);
+		return std::string();
+	}
+
+private:
+	std::function<Resp(const Req&)> handler;
+	std::function<void(std::exception&)> errorHander;
+	std::function<Req(const std::string&)> decoder;
+	std::function<std::string(const Resp&)> encoder;
+};
+
+template <typename Ind>
+class IndHandlerWtihFunctor : public Handler
+{
+public:
+	IndHandlerWtihFunctor(std::function<void(const Ind&)> p_handler,
+		std::function<Ind(const std::string&)> p_decoder)
+		: handler(p_handler), decoder(p_decoder)
+	{}
+	IndHandlerWtihFunctor(std::function<void(const Ind&)> p_handler,
+		std::function<void(std::exception&)> p_errorHandler,
+		std::function<Ind(const std::string&)> p_decoder)
+		: handler(p_handler), errorHander(p_errorHandler), decoder(p_decoder)
+	{}
+
+	std::string handle(const std::string& p_payload)
+	{
+		handle(decoder(p_payload));
+		return std::string();
+	}
+	std::string onError(std::exception& e)
+	{
+		if (onError)
+			onError(e);
+		return std::string();
+	}
+
+private:
+	std::function<void(const Ind&)> handler;
+	std::function<void(std::exception&)> errorHander;
+	std::function<Ind(const std::string&)> decoder;
+};
+
 }
