@@ -2,12 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 project(Msg)
 
-link_directories(
-    C:/Users/pikwiatk/boost_1_61_0/binMsvc
-    D:/googletest-release-1.6.0/Build/Debug
-    D:/googlemock-release-1.6.0/Build/Debug
-    C:/Users/pikwiatk/sock/BuildMS/Release
-)
+add_subdirectory(sock)
 
 add_library(
     libMsg
@@ -23,63 +18,65 @@ target_include_directories(
     libMsg
     PUBLIC
     Include
-    ../sock/Include
-    C:/Users/pikwiatk/boost_1_61_0
-    C:/Users/pikwiatk/googletest-release-1.6.0/include
-    C:/Users/pikwiatk/googlemock-release-1.6.0/include
+    sock/Include
+    C:/Users/pikwiatk/boost_1_85_0
+#    C:/Users/pikwiatk/googletest-release-1.6.0/include
+#    C:/Users/pikwiatk/googlemock-release-1.6.0/include
 )
 
 add_executable(
-    ServerEx
+    MsgServerEx
     Source/ServerAppEx.cpp
 )
 
 target_include_directories(
-    ServerEx
+    MsgServerEx
     PUBLIC
     Include
-    ../sock/Include
-    C:/Users/pikwiatk/boost_1_61_0
-    C:/Users/pikwiatk/googletest-release-1.6.0/include
-    C:/Users/pikwiatk/googlemock-release-1.6.0/include
+    sock/Include
+    C:/Users/pikwiatk/boost_1_85_0
+#    C:/Users/pikwiatk/googletest-release-1.6.0/include
+#    C:/Users/pikwiatk/googlemock-release-1.6.0/include
 )
 
 add_dependencies(
-    ServerEx
+    MsgServerEx
     libMsg
+    libSock
 )
 
 target_link_libraries(
-    ServerEx
+    MsgServerEx
     libMsg
-    libSock.lib
+    libSock
     ws2_32
 )
 
 add_executable(
-    ClientEx
+    MsgClientEx
     Source/ClientAppEx.cpp
 )
 
 target_include_directories(
-    ClientEx
+    MsgClientEx
     PUBLIC
     Include
-    ../sock/Include
-    C:/Users/pikwiatk/boost_1_61_0
-    C:/Users/pikwiatk/googletest-release-1.6.0/include
-    C:/Users/pikwiatk/googlemock-release-1.6.0/include
+    sock/Include
+    C:/Users/pikwiatk/boost_1_85_0
+#    C:/Users/pikwiatk/googletest-release-1.6.0/include
+#    C:/Users/pikwiatk/googlemock-release-1.6.0/include
 )
 
 add_dependencies(
-    ClientEx
+    MsgClientEx
     libMsg
+    libSock
 )
 
 target_link_libraries(
-    ClientEx
+    MsgClientEx
     libMsg
-    libSock.lib
+    libSock
     ws2_32
 )
 

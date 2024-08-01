@@ -183,7 +183,7 @@ void Service<MsgId>::addReqHandler(std::unique_ptr<HandlerType> p_handler)
 	addHandler(
 		ReqT::id,
 		std::move(msg::buildRequestDecodingHandler<HandlerType, ExceptionT>(
-			std::move(p_handler), &Codec::decode<ReqT> , &Codec::encode<RespT>)),
+			std::move(p_handler), &Codec::template decode<ReqT> , &Codec::template encode<RespT>)),
 		Processing::Sync
 	);
 }
@@ -198,7 +198,7 @@ void Service<MsgId>::addIndHandler(std::unique_ptr<HandlerType> p_handler, Proce
 	addHandler(
 		IndT::id,
 		std::move(msg::buildIndicationDecodingHandler<HandlerType, ExceptionT>(
-			std::move(p_handler), &Codec::decode<IndT>)),
+			std::move(p_handler), &Codec::template decode<IndT>)),
 		p_type
 	);
 }
@@ -209,7 +209,7 @@ void Service<MsgId>::addFunReqHandler(std::function<RespType(const ReqType&)> p_
 {
 	addHandler(
 		ReqType::id,
-		std::make_unique<HandlerWtihFunctor<ReqType, RespType>>(p_handler, &Codec::decode<ReqType>, &Codec::encode<RespType>),
+		std::make_unique<HandlerWtihFunctor<ReqType, RespType>>(p_handler, &Codec::template decode<ReqType>, &Codec::template encode<RespType>),
 		Processing::Sync);
 }
 
@@ -219,7 +219,7 @@ void Service<MsgId>::addFunIndHandler(std::function<void(const IndType&)> p_hand
 {
 	addHandler(
 		IndType::id,
-		std::make_unique<IndHandlerWtihFunctor<IndType>>(p_handler, &Codec::decode<IndType>),
+		std::make_unique<IndHandlerWtihFunctor<IndType>>(p_handler, &Codec::template decode<IndType>),
 		p_type);
 }
 
@@ -260,6 +260,7 @@ std::string Service<MsgId>::NativeStopHandler::handle(const std::string& p_msg)
 	service.stop();
 	if (callback)
 		callback();
+	return "";
 }
 
 }
