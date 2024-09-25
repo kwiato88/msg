@@ -21,4 +21,6 @@ private:
 	ConnectionFactory factory;
 };
 
+//TODO: add decoding client
+
 }

@@ -69,45 +69,14 @@ struct Codec
 	{
 		return idToString(IdType::Stop) + ":";
 	}
-/*
-	template <>
-	static Stop decode<Stop>(const std::string&)
-	{
-		return Stop{};
-	}
-*/
 	static std::string encode(const Echo& p_msg)
 	{
 		return idToString(IdType::Echo) + ":" + p_msg.message;
 	}
-/*
-	template <>
-	static Echo decode<Echo>(const std::string& p_msg)
-	{
-		auto separatorPos = p_msg.find(':');
-		if(separatorPos == std::string::npos)
-			throw ExceptionType("Printer::codec: no separator(:) in payload");
-		Echo msg;
-		msg.message = p_msg.substr(separatorPos+1);
-		return msg;
-	}
-*/
 	static std::string encode(const Print& p_msg)
 	{
 		return idToString(IdType::Print) + ":" + p_msg.message;
 	}
-	/*
-	template <>
-	static Print decode<Print>(const std::string& p_msg)
-	{
-		auto separatorPos = p_msg.find(':');
-		if(separatorPos == std::string::npos)
-			throw ExceptionType("Printer::codec: no separator(:) in payload");
-		Print msg;
-		msg.message = p_msg.substr(separatorPos+1);
-		return msg;
-	}
-*/
 };
 
 template <>
