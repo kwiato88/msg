@@ -18,20 +18,31 @@ int main()
 		msg::Client client(&createConnectionToLocalTcpIpHost);
 		std::string req, resp;
 
-		req = "req1";
+		req = "echo:req1";
 		std::cout << "Send request [" << req << "]" << std::endl;
 		resp = client.sendReq(req);
 		std::cout << "Received response [" << resp << "]" << std::endl;
 
-		req = "print";
+		req = "print:dummyMessage";
 		std::cout << "Send print ind [" << req << "]" << std::endl;
 		client.sendInd(req);
 
-		req = "dummy req";
+		req = "echo:dummy req";
 		std::cout << "Send request [" << req << "]" << std::endl;
 		resp = client.sendReq(req);
 		std::cout << "Received response [" << resp << "]" << std::endl;
 
+		try
+		{
+			req = "getPrinterStatus:";
+			std::cout << "Send request [" << req << "]" << std::endl;
+			resp = client.sendReq(req);
+			std::cout << "Received response [" << resp << "]" << std::endl;
+		}
+		catch (std::exception& e)
+		{
+			std::cout << "Error while geting printer status: " << e.what() << std::endl;
+		}
 		try
 		{
 			req = "getPrinterStatus";
@@ -44,15 +55,7 @@ int main()
 			std::cout << "Error while geting printer status: " << e.what() << std::endl;
 		}
 
-		req = "toPrinter";
-		std::cout << "Send ind [" << req << "]" << std::endl;
-		client.sendInd(req);
-
-		req = "setPrinterStatus";
-		std::cout << "Send ind [" << req << "]" << std::endl;
-		client.sendInd(req);
-
-		req = "stop";
+		req = "stop:";
 		std::cout << "Send stop server ind" << std::endl;
 		client.sendInd(req);
 

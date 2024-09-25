@@ -15,7 +15,8 @@ std::string TcpIpServer::receiveReq()
 
 void TcpIpServer::reply(const std::string& p_response)
 {
-	conn->send(p_response);
+	if(!p_response.empty())
+		conn->send(p_response);
 	conn.reset();
 }
 

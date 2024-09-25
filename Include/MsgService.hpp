@@ -3,10 +3,8 @@
 #include <iostream>
 #include <memory>
 #include <map>
-#include <functional>
 #include "MsgHandler.hpp"
 #include "MsgServer.hpp"
-
 #include "MsgReqHandler.hpp"
 #include "MsgDecodingHandler.hpp"
 
@@ -15,252 +13,118 @@ namespace msg
 
 typedef std::function<std::unique_ptr<Server>()> ServerFacotry;
 
-template<typename MsgId>
+// Definitions inside Codec
+//   typename Codec::ExceptionType
+//   typename Codec::IdType
+//   IdType Codec::getId(const std::string& p_data)
+//   std::string Codec::encode(const MsgType& msg)
+//   MsgType Codec::decode(const std::string& msg)
+template <typename Codec>
 class Service
 {
 public:
-	enum class Processing
-	{
-		Sync,
-		Async
-	};
-	typedef std::function<MsgId(const std::string& p_payload)> GetMsgId;
+	using IdType = typename Codec::IdType;
 
-	Service(ServerFacotry p_facotry, GetMsgId p_getMsgId);
-
+	Service(ServerFacotry p_facotry);
 	void start();
 	void stop();
 	void cleanup();
-	void addHandler(MsgId p_id, std::unique_ptr<Handler> p_handler, Processing p_type = Processing::Sync);
-	void setDefaultHandler(std::unique_ptr<Handler> p_handler, Processing p_type = Processing::Sync);
-
-	template<typename HandlerType, typename Codec>
-	void addReqHandler(std::unique_ptr<HandlerType> p_handler);
-	template<typename HandlerType, typename Codec>
-	void addIndHandler(std::unique_ptr<HandlerType> p_handler, Processing p_type = Processing::Sync);
-	template<typename Codec, typename ReqType, typename RespType>
-	void addFunReqHandler(std::function<RespType(const ReqType&)> p_handler);
-	template<typename Codec, typename IndType>
-	void addFunIndHandler(std::function<void(const IndType&)> p_handler, Processing p_type = Processing::Sync);
-
-	template<typename StopMessage>
-	class StopHandler : public msg::IndicationHandler<StopMessage>
-	{
-	public:
-		StopHandler(Service<MsgId>& p_service);
-		StopHandler(Service<MsgId>& p_service, std::function<void(void)> p_callback);
-		void handle(const StopMessage& p_msg);
-	private:
-		Service<MsgId>& service;
-		std::function<void(void)> callback;
-	};
-
-	class NativeStopHandler : public msg::Handler
-	{
-	public:
-		NativeStopHandler(Service<MsgId>& p_service);
-		NativeStopHandler(Service<MsgId>& p_service, std::function<void(void)> p_callback);
-		std::string handle(const std::string&);
-	private:
-		Service<MsgId>& service;
-		std::function<void(void)> callback;
-	};
+	template <typename Req, typename Resp>
+	void addHandler(IdType p_id, std::unique_ptr<ReqHandler<Req, Resp> > p_handler);
+	template <typename Ind>
+	void addHandler(IdType p_id, std::unique_ptr<IndHandler<Ind> > p_handler);
+	void setDefaultHandler(std::unique_ptr<Handler> p_handler);
 
 private:
-	struct HandlingData
-	{
-		HandlingData(Processing p_type, std::unique_ptr<Handler> p_handler)
-			: processingType(p_type), handler(std::move(p_handler))
-		{}
-		Processing processingType;
-		std::unique_ptr<Handler> handler;
-	};
 	void setup();
-	void handleRequest();
-	void handle(const std::string& p_msg, const HandlingData& p_context);
-	void reply(const std::string& p_resp);
+	void handle();
+	void reply(const std::string& p_response);
 
 	ServerFacotry factory;
-	GetMsgId getMsgId;
 	std::unique_ptr<Server> server;
 	bool isRunning;
-	std::map<MsgId, HandlingData> handlers;
-	HandlingData defaultHandler;
+	std::map<IdType, std::shared_ptr<Handler> > handlers;
+	std::unique_ptr<Handler> defaultHandler;
 };
 
-template<typename MsgId>
-Service<MsgId>::Service(ServerFacotry p_facotry, GetMsgId p_getMsgId)
-	: factory(p_facotry), getMsgId(p_getMsgId), server(nullptr), isRunning(false), defaultHandler(Processing::Sync, std::make_unique<EmptyHandler>())
+template<typename Codec>
+Service<Codec>::Service(ServerFacotry p_facotry)
+	: factory(p_facotry), server(nullptr), isRunning(false), defaultHandler(std::make_unique<NullHandler>())
 {}
 
-template<typename MsgId>
-void Service<MsgId>::setup()
+template<typename Codec>
+void Service<Codec>::start()
+{
+	setup();
+	while (isRunning)
+		handle();
+}
+
+template<typename Codec>
+void Service<Codec>::stop()
+{
+	isRunning = false;
+}
+
+template<typename Codec>
+void Service<Codec>::cleanup()
+{
+	server.reset();
+}
+
+template<typename Codec>
+void Service<Codec>::setup()
 {
 	server = std::move(factory());
 	isRunning = true;
 }
 
-template<typename MsgId>
-void Service<MsgId>::start()
+template<typename Codec>
+void Service<Codec>::reply(const std::string& p_response)
 {
-	setup();
-	while (isRunning)
-		handleRequest();
+	if(p_response.empty())
+		server->reply(boost::none);
+	else
+		server->reply(p_response);
 }
 
-template<typename MsgId>
-void Service<MsgId>::handleRequest()
+template<typename Codec>
+void Service<Codec>::handle()
 {
 	try
 	{
 		std::string msg = server->receiveReq();
-		MsgId id = getMsgId(msg);
-		auto handler = handlers.find(id);
+		auto handler = handlers.find(Codec::getId(msg));
 		if (handler == handlers.end())
-			handle(msg, defaultHandler);
+			reply(defaultHandler->handle(msg));
 		else
-			handle(msg, handler->second);
+			reply(handler->second->handle(msg));
 	}
 	catch (std::exception& e)
 	{
-		std::cerr << "ERROR while handling message. " << e.what() << std::endl;
+		std::cerr << "Service: error while handling message. " << e.what() << std::endl;
+		server->reply(boost::none);
 	}
 }
 
-template<typename MsgId>
-void Service<MsgId>::handle(const std::string& p_msg, const HandlingData& p_context)
+template <typename Codec>
+template <typename Req, typename Resp>
+void Service<Codec>::addHandler(IdType p_id, std::unique_ptr<ReqHandler<Req, Resp> > p_handler)
 {
-	if (p_context.processingType == Processing::Sync)
-		reply(p_context.handler->handleMsg(p_msg));
-	else
-	{
-		server->reply(boost::none);
-		p_context.handler->handleMsg(p_msg);
-	}
+	handlers.insert_or_assign(p_id, std::make_unique<DecodingHandler<Req, Resp, Codec> >(std::move(p_handler)));
 }
 
-template<typename MsgId>
-void Service<MsgId>::reply(const std::string& p_resp)
+template <typename Codec>
+template <typename Ind>
+void Service<Codec>::addHandler(IdType p_id, std::unique_ptr<IndHandler<Ind> > p_handler)
 {
-	if (p_resp.empty())
-		server->reply(boost::none);
-	else
-		server->reply(p_resp);
+	handlers.insert_or_assign(p_id, std::make_unique<IndicationDecondingHandler<Ind, Codec> >(std::move(p_handler)));
 }
 
-template<typename MsgId>
-void Service<MsgId>::stop()
+template <typename Codec>
+void Service<Codec>::setDefaultHandler(std::unique_ptr<Handler> p_handler)
 {
-	isRunning = false;
-}
-
-template<typename MsgId>
-void Service<MsgId>::cleanup()
-{
-	server.reset();
-}
-
-template<typename MsgId>
-void Service<MsgId>::addHandler(MsgId p_id, std::unique_ptr<Handler> p_handler, Processing p_type)
-{
-	handlers.insert_or_assign(p_id, std::move(HandlingData(p_type, std::move(p_handler))));
-}
-
-template<typename MsgId>
-void Service<MsgId>::setDefaultHandler(std::unique_ptr<Handler> p_handler, Processing p_type)
-{
-	defaultHandler = std::move(HandlingData(p_type, std::move(p_handler)));
-}
-
-template <typename MsgId>
-template<typename HandlerType, typename Codec>
-void Service<MsgId>::addReqHandler(std::unique_ptr<HandlerType> p_handler)
-{
-	using ReqT = typename HandlerType::RequestType;
-	using RespT = typename HandlerType::ResponseType;
-	using ExceptionT = typename Codec::ExceptionType;
-
-	addHandler(
-		ReqT::id,
-		std::move(msg::buildRequestDecodingHandler<HandlerType, ExceptionT>(
-			std::move(p_handler), &Codec::template decode<ReqT> , &Codec::template encode<RespT>)),
-		Processing::Sync
-	);
-}
-
-template <typename MsgId>
-template<typename HandlerType, typename Codec>
-void Service<MsgId>::addIndHandler(std::unique_ptr<HandlerType> p_handler, Processing p_type)
-{
-	using IndT = typename HandlerType::IndicationType;
-	using ExceptionT = typename Codec::ExceptionType;
-
-	addHandler(
-		IndT::id,
-		std::move(msg::buildIndicationDecodingHandler<HandlerType, ExceptionT>(
-			std::move(p_handler), &Codec::template decode<IndT>)),
-		p_type
-	);
-}
-
-template <typename MsgId>
-template<typename Codec, typename ReqType, typename RespType>
-void Service<MsgId>::addFunReqHandler(std::function<RespType(const ReqType&)> p_handler)
-{
-	addHandler(
-		ReqType::id,
-		std::make_unique<HandlerWtihFunctor<ReqType, RespType>>(p_handler, &Codec::template decode<ReqType>, &Codec::template encode<RespType>),
-		Processing::Sync);
-}
-
-template <typename MsgId>
-template<typename Codec, typename IndType>
-void Service<MsgId>::addFunIndHandler(std::function<void(const IndType&)> p_handler, Processing p_type)
-{
-	addHandler(
-		IndType::id,
-		std::make_unique<IndHandlerWtihFunctor<IndType>>(p_handler, &Codec::template decode<IndType>),
-		p_type);
-}
-
-template <typename MsgId>
-template<typename StopMessage>
-Service<MsgId>::StopHandler<StopMessage>::StopHandler(Service<MsgId>& p_service)
-	: service(p_service)
-{}
-
-template <typename MsgId>
-template<typename StopMessage>
-Service<MsgId>::StopHandler<StopMessage>::StopHandler(Service<MsgId>& p_service, std::function<void(void)> p_callback)
-	: service(p_service), callback(p_callback)
-{}
-
-template <typename MsgId>
-template<typename StopMessage>
-void Service<MsgId>::StopHandler<StopMessage>::handle(const StopMessage& p_msg)
-{
-	service.stop();
-	if (callback)
-		callback();
-}
-
-template <typename MsgId>
-Service<MsgId>::NativeStopHandler::NativeStopHandler(Service<MsgId>& p_service)
-	: service(p_service)
-{}
-
-template <typename MsgId>
-Service<MsgId>::NativeStopHandler::NativeStopHandler(Service<MsgId>& p_service, std::function<void(void)> p_callback)
-	: service(p_service), callback(p_callback)
-{}
-
-template <typename MsgId>
-std::string Service<MsgId>::NativeStopHandler::handle(const std::string& p_msg)
-{
-	service.stop();
-	if (callback)
-		callback();
-	return "";
+	defaultHandler = std::move(p_handler);
 }
 
 }

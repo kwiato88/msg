@@ -1,97 +1,171 @@
 #include <iostream>
 #include <stdexcept>
 #include "MsgService.hpp"
+#include "MsgReqHandler.hpp"
 #include "MsgTcpIpServer.hpp"
 #include "SockSocketUtils.hpp"
+
+namespace Printer
+{
 
 enum class MessageId
 {
 	Stop,
 	Echo,
-	Print,
-	SendToPrinter,
-	GetPrinterStatus,
-	SetPrinterStatus
+	Print
 };
 
-MessageId getId(const std::string& p_msg)
+struct Stop {};
+struct Echo
 {
-	if (p_msg == "stop")
-		return MessageId::Stop;
-	if (p_msg == "print")
-		return MessageId::Print;
-	if (p_msg == "toPrinter")
-		return MessageId::SendToPrinter;
-	if (p_msg == "getPrinterStatus")
-		return MessageId::GetPrinterStatus;
-	if (p_msg == "setPrinterStatus")
-		return MessageId::SetPrinterStatus;
-	return MessageId::Echo;
+	std::string message;
+};
+struct Print
+{
+	std::string message;
+};
+
+// "Id:[message]"
+struct Codec
+{
+	using ExceptionType = typename std::runtime_error;
+	using IdType = typename Printer::MessageId;
+
+	static IdType idFromString(const std::string& p_id)
+	{
+		if (p_id == "stop")
+			return IdType::Stop;
+		if (p_id == "print")
+			return IdType::Print;
+		if (p_id == "echo")
+			return IdType::Echo;
+		throw ExceptionType(std::string("Printer::codec: unknown id ") + p_id);
+	}
+	static std::string idToString(IdType p_id)
+	{
+		switch(p_id)
+		{
+			case IdType::Stop : return "stop";
+			case IdType::Print : return "print";
+			case IdType::Echo : return "echo";
+		}
+		throw ExceptionType("Printer::codec: unknown id");
+	}
+	static IdType getId(const std::string& p_data)
+	{
+		auto separatorPos = p_data.find(':');
+		if(separatorPos == std::string::npos)
+			throw ExceptionType("Printer::codec: no separator(:) in payload");
+		return idFromString(p_data.substr(0, separatorPos));
+	}
+
+	template <typename T>
+	static T decode(const std::string&)
+	{
+		throw ExceptionType("Printer::codec: decode not defined");
+	}
+
+	static std::string encode(const Stop&)
+	{
+		return idToString(IdType::Stop) + ":";
+	}
+/*
+	template <>
+	static Stop decode<Stop>(const std::string&)
+	{
+		return Stop{};
+	}
+*/
+	static std::string encode(const Echo& p_msg)
+	{
+		return idToString(IdType::Echo) + ":" + p_msg.message;
+	}
+/*
+	template <>
+	static Echo decode<Echo>(const std::string& p_msg)
+	{
+		auto separatorPos = p_msg.find(':');
+		if(separatorPos == std::string::npos)
+			throw ExceptionType("Printer::codec: no separator(:) in payload");
+		Echo msg;
+		msg.message = p_msg.substr(separatorPos+1);
+		return msg;
+	}
+*/
+	static std::string encode(const Print& p_msg)
+	{
+		return idToString(IdType::Print) + ":" + p_msg.message;
+	}
+	/*
+	template <>
+	static Print decode<Print>(const std::string& p_msg)
+	{
+		auto separatorPos = p_msg.find(':');
+		if(separatorPos == std::string::npos)
+			throw ExceptionType("Printer::codec: no separator(:) in payload");
+		Print msg;
+		msg.message = p_msg.substr(separatorPos+1);
+		return msg;
+	}
+*/
+};
+
+template <>
+Stop Codec::decode<Stop>(const std::string&)
+{
+	return Stop{};
+}
+template <>
+Echo Codec::decode<Echo>(const std::string& p_msg)
+{
+	auto separatorPos = p_msg.find(':');
+	if(separatorPos == std::string::npos)
+		throw ExceptionType("Printer::codec: no separator(:) in payload");
+	Echo msg;
+	msg.message = p_msg.substr(separatorPos+1);
+	return msg;
+}
+template <>
+Print Codec::decode<Print>(const std::string& p_msg)
+{
+	auto separatorPos = p_msg.find(':');
+	if(separatorPos == std::string::npos)
+		throw ExceptionType("Printer::codec: no separator(:) in payload");
+	Print msg;
+	msg.message = p_msg.substr(separatorPos+1);
+	return msg;
 }
 
-class EchoReqHandler : public msg::Handler
+class EchoReqHandler : public msg::ReqHandler<Echo, Echo>
 {
 public:
-	std::string handle(const std::string& p_req) override
+	Echo handle(const Echo& p_req) override
 	{
-		std::cout << "Echo message. Received [" << p_req << "]. Reply the same" << std::endl;
+		std::cout << "Echo message. Received [" << p_req.message << "]. Reply the same" << std::endl;
 		return p_req;
 	}
 };
 
-class PrintIndHandler : public msg::Handler
+class PrintIndHandler : public msg::IndHandler<Print>
+{
+public:
+	void handle(const Print& p_req) override
+	{
+		std::cout << "Print message. Received [" << p_req.message << "]. Reply nothing" << std::endl;
+	}
+};
+
+class UnexpectedMsgHandler : public msg::Handler
 {
 public:
 	std::string handle(const std::string& p_req) override
 	{
-		std::cout << "Print message. Received [" << p_req << "]. Reply nothing" << std::endl;
+		std::cout << "Unexpected message. Received [" << p_req << "]. Reply nothing" << std::endl;
 		return "";
 	}
 };
 
-class SendToPrinterIndHandler : public msg::Handler
-{
-public:
-	std::string handle(const std::string& p_req) override
-	{
-		std::cout << "Send to printer message. Received [" << p_req << "]." << std::endl;
-		throw std::runtime_error("Failed to print");
-		return "";
-	}
-	std::string onError(std::exception& e)
-	{
-		std::cout << "ERROR while handling send to printer. Detail: " << e.what() << std::endl;
-		return "";
-	}
-};
-
-class GetPrinterStatusReqHandler : public msg::Handler
-{
-public:
-	std::string handle(const std::string& p_req) override
-	{
-		std::cout << "Get printer status message. Received [" << p_req << "]." << std::endl;
-		throw std::runtime_error("FAILURE");
-		return "";
-	}
-	std::string onError(std::exception& e)
-	{
-		std::cout << "ERROR while handling get printer status. Detail: " << e.what() << std::endl;
-		return "";
-	}
-};
-
-class LoggingHandler : public msg::Handler
-{
-public:
-	std::string handle(const std::string& p_req) override
-	{
-		std::cout << "Log message. Received [" << p_req << "]." << std::endl;
-		return "";
-	}
-};
-
-using BaseService = msg::Service<MessageId>;
+using BaseService = msg::Service<Codec>;
 
 std::unique_ptr<msg::Server> createLocalTcpIpServer()
 {
@@ -99,21 +173,34 @@ std::unique_ptr<msg::Server> createLocalTcpIpServer()
 	return std::make_unique<msg::TcpIpServer>("127.0.0.1", "1234");
 }
 
-class EchoService : public BaseService
+class Service : public BaseService
 {
-public:
-	EchoService()
-		: BaseService(&createLocalTcpIpServer, &getId)
+	class StopHandler : public msg::IndHandler<Stop>
 	{
-		addHandler(MessageId::Stop, std::make_unique<BaseService::NativeStopHandler>(*this));
-		addHandler(MessageId::Echo, std::make_unique<EchoReqHandler>());
-		addHandler(MessageId::Print, std::make_unique<PrintIndHandler>());
-		addHandler(MessageId::SendToPrinter, std::make_unique<SendToPrinterIndHandler>());
-		addHandler(MessageId::GetPrinterStatus, std::make_unique<GetPrinterStatusReqHandler>());
-		setDefaultHandler(std::make_unique<LoggingHandler>());
+	public:
+		StopHandler(BaseService& p_service)
+			: service(p_service)
+		{}
+		void handle(const Stop&) override
+		{
+			std::cout << "Stop message. Stop service" << std::endl;
+			service.stop();
+		}
+	private:
+		BaseService& service;
+	};
+public:
+	Service()
+		: BaseService(&createLocalTcpIpServer)
+	{
+		addHandler<Stop>(MessageId::Stop, std::make_unique<StopHandler>(*this));
+		addHandler<Echo, Echo>(MessageId::Echo, std::make_unique<EchoReqHandler>());
+		addHandler<Print>(MessageId::Print, std::make_unique<PrintIndHandler>());
+		setDefaultHandler(std::make_unique<UnexpectedMsgHandler>());
 	}
 };
 
+}
 
 int main()
 {
@@ -121,7 +208,7 @@ int main()
 	{
 		sock::init();
 		std::cout << "Create service" << std::endl;
-		EchoService ser;
+		Printer::Service ser;
 		std::cout << "Start service" << std::endl;
 		ser.start();
 		std::cout << "Service finished" << std::endl;

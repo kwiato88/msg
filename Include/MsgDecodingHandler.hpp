@@ -3,132 +3,59 @@
 #include <memory>
 #include <functional>
 #include "MsgHandler.hpp"
+#include "MsgReqHandler.hpp"
 
 namespace msg
 {
 
-template <typename Req, typename Resp, typename CodecException>
+template <typename Req, typename Resp, typename Codec>
 class DecodingHandler : public Handler
 {
 public:
-	DecodingHandler(std::unique_ptr<ReqHandler<Req, Resp>> p_handler,
-					std::function<Req(const std::string&)> p_decoder,
-					std::function<std::string(const Resp&)> p_encoder)
-		: handler(std::move(p_handler)), decoder(p_decoder), encoder(p_encoder)
+	DecodingHandler(std::unique_ptr<ReqHandler<Req, Resp> > p_handler)
+		: handler(std::move(p_handler))
 	{}
 
 	std::string handle(const std::string& p_payload)
 	{
-		return encoder(handler->handle(decoder(p_payload)));
+		try
+		{
+			return Codec::encode(handler->handle(Codec::template decode<Req>(p_payload)));
+		} catch (typename Codec::ExceptionType& e)
+		{
+			std::cerr << "DecodingHandler: " << e.what() << std::endl;
+			return "";
+		}
 	}
-	std::string onError(std::exception& e)
-	{
-		handler->onError(e);
-		return std::string();
-	}
-
 
 private:
-	std::unique_ptr<ReqHandler<Req, Resp>> handler;
-	std::function<Req(const std::string&)> decoder;
-	std::function<std::string(const Resp&)> encoder;
+	std::unique_ptr<ReqHandler<Req, Resp> > handler;
 };
 
-template <typename Ind, typename CodecException>
+template <typename Ind, typename Codec>
 class IndicationDecondingHandler : public Handler
 {
 public:
-	IndicationDecondingHandler(std::unique_ptr<IndicationHandler<Ind>> p_handler,
-		std::function<Ind(const std::string&)> p_decoder)
-		: handler(std::move(p_handler)), decoder(p_decoder)
+	IndicationDecondingHandler(std::unique_ptr<IndHandler<Ind> > p_handler)
+		: handler(std::move(p_handler))
 	{}
 
 	std::string handle(const std::string& p_payload)
 	{
-		handler->handle(decoder(p_payload));
-		return std::string();
-	}
-	std::string onError(std::exception& e)
-	{
-		handler->onError(e);
-		return std::string();
-	}
-
-private:
-	std::unique_ptr<IndicationHandler<Ind>> handler;
-	std::function<Ind(const std::string&)> decoder;
-};
-
-template<typename ReqHandlerType, typename CodecException>
-std::unique_ptr<Handler> buildRequestDecodingHandler(
-	std::unique_ptr<ReqHandlerType> p_handler,
-	std::function<typename ReqHandlerType::RequestType(const std::string&)> p_decoder,
-	std::function<std::string(const typename ReqHandlerType::ResponseType&)> p_encoder)
-{
-	return std::make_unique<DecodingHandler<typename ReqHandlerType::RequestType, typename ReqHandlerType::ResponseType, CodecException>>(std::move(p_handler), p_decoder, p_encoder);
-}
-
-template<typename IndHandlerType, typename CodecException>
-std::unique_ptr<Handler> buildIndicationDecodingHandler(
-	std::unique_ptr<IndHandlerType> p_handler,
-	std::function<typename IndHandlerType::IndicationType(const std::string&)> p_decoder)
-{
-	return std::make_unique<IndicationDecondingHandler<typename IndHandlerType::IndicationType, CodecException>>(std::move(p_handler), p_decoder);
-}
-
-template <typename Req, typename Resp>
-class HandlerWtihFunctor : public Handler
-{
-public:
-	HandlerWtihFunctor(std::function<Resp(const Req&)> p_handler,
-		std::function<Req(const std::string&)> p_decoder,
-		std::function<std::string(const Resp&)> p_encoder)
-		: handler(p_handler), decoder(p_decoder), encoder(p_encoder)
-	{}
-
-	std::string handle(const std::string& p_payload)
-	{
-		return encoder(handler(decoder(p_payload)));
-	}
-	std::string onError(std::exception& e)
-	{
-		if (errorHander)
-			errorHander(e);
-		return std::string();
+		try
+		{
+			handler->handle(Codec::template decode<Ind>(p_payload));
+			return std::string();
+		}
+		catch(typename Codec::ExceptionType& e)
+		{
+			std::cerr << "IndicationDecondingHandler: " << e.what() << std::endl;
+			return std::string();
+		}
 	}
 
 private:
-	std::function<Resp(const Req&)> handler;
-	std::function<void(std::exception&)> errorHander;
-	std::function<Req(const std::string&)> decoder;
-	std::function<std::string(const Resp&)> encoder;
-};
-
-template <typename Ind>
-class IndHandlerWtihFunctor : public Handler
-{
-public:
-	IndHandlerWtihFunctor(std::function<void(const Ind&)> p_handler,
-		std::function<Ind(const std::string&)> p_decoder)
-		: handler(p_handler), decoder(p_decoder)
-	{}
-
-	std::string handle(const std::string& p_payload)
-	{
-		handler(decoder(p_payload));
-		return std::string();
-	}
-	std::string onError(std::exception& e)
-	{
-		if (errorHander)
-			errorHander(e);
-		return std::string();
-	}
-
-private:
-	std::function<void(const Ind&)> handler;
-	std::function<void(std::exception&)> errorHander;
-	std::function<Ind(const std::string&)> decoder;
+	std::unique_ptr<IndHandler<Ind> > handler;
 };
 
 }

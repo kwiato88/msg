@@ -12,18 +12,16 @@ public:
 
 	virtual ~ReqHandler() {}
 	virtual Resp handle(const Req& p_message) = 0;
-	virtual void onError(std::exception&) {}
 };
 
 template <typename Ind>
-class IndicationHandler
+class IndHandler
 {
 public:
 	typedef Ind IndicationType;
 
-	virtual ~IndicationHandler() {}
+	virtual ~IndHandler() {}
 	virtual void handle(const Ind& p_message) = 0;
-	virtual void onError(std::exception&) {}
 };
 
 }

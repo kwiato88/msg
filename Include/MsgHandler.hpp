@@ -10,15 +10,14 @@ class Handler
 {
 public:
     virtual ~Handler() {}
-	virtual std::string handleMsg(const std::string& p_req);
 	virtual std::string handle(const std::string& p_req) = 0;
-	virtual std::string onError(std::exception& e);
 };
 
-class EmptyHandler : public Handler
+
+class NullHandler : public Handler
 {
 public:
-	std::string handle(const std::string&);
+	std::string handle(const std::string& p_req) override;
 };
 
 }
