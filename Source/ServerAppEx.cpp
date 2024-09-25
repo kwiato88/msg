@@ -162,10 +162,10 @@ public:
 	Service()
 		: BaseService(&createLocalTcpIpServer)
 	{
-		addHandler<Stop>(MessageId::Stop, std::make_unique<StopHandler>(*this));
-		addHandler<Echo, Echo>(MessageId::Echo, std::make_unique<EchoReqHandler>());
-		addHandler<Print>(MessageId::Print, std::make_unique<PrintIndHandler>());
-		setDefaultHandler(std::make_unique<UnexpectedMsgHandler>());
+		addHandler<Stop>(MessageId::Stop, std::make_shared<StopHandler>(*this));
+		addHandler<Echo, Echo>(MessageId::Echo, std::make_shared<EchoReqHandler>());
+		addHandler<Print>(MessageId::Print, std::make_shared<PrintIndHandler>());
+		setDefaultHandler(std::make_shared<UnexpectedMsgHandler>());
 	}
 };
 

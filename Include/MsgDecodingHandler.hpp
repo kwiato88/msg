@@ -12,8 +12,8 @@ template <typename Req, typename Resp, typename Codec>
 class DecodingHandler : public Handler
 {
 public:
-	DecodingHandler(std::unique_ptr<ReqHandler<Req, Resp> > p_handler)
-		: handler(std::move(p_handler))
+	DecodingHandler(std::shared_ptr<ReqHandler<Req, Resp> > p_handler)
+		: handler(p_handler)
 	{}
 
 	std::string handle(const std::string& p_payload)
@@ -29,15 +29,15 @@ public:
 	}
 
 private:
-	std::unique_ptr<ReqHandler<Req, Resp> > handler;
+	std::shared_ptr<ReqHandler<Req, Resp> > handler;
 };
 
 template <typename Ind, typename Codec>
 class IndicationDecondingHandler : public Handler
 {
 public:
-	IndicationDecondingHandler(std::unique_ptr<IndHandler<Ind> > p_handler)
-		: handler(std::move(p_handler))
+	IndicationDecondingHandler(std::shared_ptr<IndHandler<Ind> > p_handler)
+		: handler(p_handler)
 	{}
 
 	std::string handle(const std::string& p_payload)
@@ -55,7 +55,7 @@ public:
 	}
 
 private:
-	std::unique_ptr<IndHandler<Ind> > handler;
+	std::shared_ptr<IndHandler<Ind> > handler;
 };
 
 }

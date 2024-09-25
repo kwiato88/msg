@@ -30,10 +30,10 @@ public:
 	void stop();
 	void cleanup();
 	template <typename Req, typename Resp>
-	void addHandler(IdType p_id, std::unique_ptr<ReqHandler<Req, Resp> > p_handler);
+	void addHandler(IdType p_id, std::shared_ptr<ReqHandler<Req, Resp> > p_handler);
 	template <typename Ind>
-	void addHandler(IdType p_id, std::unique_ptr<IndHandler<Ind> > p_handler);
-	void setDefaultHandler(std::unique_ptr<Handler> p_handler);
+	void addHandler(IdType p_id, std::shared_ptr<IndHandler<Ind> > p_handler);
+	void setDefaultHandler(std::shared_ptr<Handler> p_handler);
 
 private:
 	void setup();
@@ -44,12 +44,12 @@ private:
 	std::unique_ptr<Server> server;
 	bool isRunning;
 	std::map<IdType, std::shared_ptr<Handler> > handlers;
-	std::unique_ptr<Handler> defaultHandler;
+	std::shared_ptr<Handler> defaultHandler;
 };
 
 template<typename Codec>
 Service<Codec>::Service(ServerFacotry p_facotry)
-	: factory(p_facotry), server(nullptr), isRunning(false), defaultHandler(std::make_unique<NullHandler>())
+	: factory(p_facotry), server(nullptr), isRunning(false), defaultHandler(std::make_shared<NullHandler>())
 {}
 
 template<typename Codec>
@@ -109,22 +109,22 @@ void Service<Codec>::handle()
 
 template <typename Codec>
 template <typename Req, typename Resp>
-void Service<Codec>::addHandler(IdType p_id, std::unique_ptr<ReqHandler<Req, Resp> > p_handler)
+void Service<Codec>::addHandler(IdType p_id, std::shared_ptr<ReqHandler<Req, Resp> > p_handler)
 {
-	handlers.insert_or_assign(p_id, std::make_unique<DecodingHandler<Req, Resp, Codec> >(std::move(p_handler)));
+	handlers.insert_or_assign(p_id, std::make_shared<DecodingHandler<Req, Resp, Codec> >(p_handler));
 }
 
 template <typename Codec>
 template <typename Ind>
-void Service<Codec>::addHandler(IdType p_id, std::unique_ptr<IndHandler<Ind> > p_handler)
+void Service<Codec>::addHandler(IdType p_id, std::shared_ptr<IndHandler<Ind> > p_handler)
 {
-	handlers.insert_or_assign(p_id, std::make_unique<IndicationDecondingHandler<Ind, Codec> >(std::move(p_handler)));
+	handlers.insert_or_assign(p_id, std::make_shared<IndicationDecondingHandler<Ind, Codec> >(p_handler));
 }
 
 template <typename Codec>
-void Service<Codec>::setDefaultHandler(std::unique_ptr<Handler> p_handler)
+void Service<Codec>::setDefaultHandler(std::shared_ptr<Handler> p_handler)
 {
-	defaultHandler = std::move(p_handler);
+	defaultHandler = p_handler;
 }
 
 }
