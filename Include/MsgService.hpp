@@ -35,6 +35,20 @@ public:
 	void addHandler(IdType p_id, std::shared_ptr<IndHandler<Ind> > p_handler);
 	void setDefaultHandler(std::shared_ptr<Handler> p_handler);
 
+	template <typename StopInd>
+	class StopHandler : public IndHandler<StopInd>
+	{
+	public:
+		StopHandler(Service& p_service)
+			: service(p_service)
+		{}
+		void handle(const StopInd&) override
+		{
+			service.stop();
+		}
+	private:
+		Service& service;
+	};
 private:
 	void setup();
 	void handle();

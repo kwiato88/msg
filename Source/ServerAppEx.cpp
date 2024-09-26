@@ -144,25 +144,11 @@ std::unique_ptr<msg::Server> createLocalTcpIpServer()
 
 class Service : public BaseService
 {
-	class StopHandler : public msg::IndHandler<Stop>
-	{
-	public:
-		StopHandler(BaseService& p_service)
-			: service(p_service)
-		{}
-		void handle(const Stop&) override
-		{
-			std::cout << "Stop message. Stop service" << std::endl;
-			service.stop();
-		}
-	private:
-		BaseService& service;
-	};
 public:
 	Service()
 		: BaseService(&createLocalTcpIpServer)
 	{
-		addHandler<Stop>(MessageId::Stop, std::make_shared<StopHandler>(*this));
+		addHandler<Stop>(MessageId::Stop, std::make_shared<BaseService::StopHandler<Stop> >(*this));
 		addHandler<Echo, Echo>(MessageId::Echo, std::make_shared<EchoReqHandler>());
 		addHandler<Print>(MessageId::Print, std::make_shared<PrintIndHandler>());
 		setDefaultHandler(std::make_shared<UnexpectedMsgHandler>());
